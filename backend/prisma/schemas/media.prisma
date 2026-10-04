@@ -1,0 +1,13 @@
+model Media {
+  id        String   @id @default(uuid())
+  url       String
+  fileKey   String   @unique
+  format    String
+  size      Int
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}

@@ -5,18 +5,24 @@ export interface LoginCredentials {
   password: string;
 }
 
+// 🚨 GÜNCELLENDİ: username eklendi
 export interface RegisterData {
   name: string;
+  username: string; 
   email: string;
   password: string;
 }
 
+// 🚨 GÜNCELLENDİ: username, bio ve avatar eklendi
 export interface AuthResponse {
   user: {
     id: string;
     email: string;
     name: string;
-    role: 'ADMIN' | 'AUTHOR' | 'MEMBER';
+    role: 'ADMIN' | 'USER';
+    username?: string;
+    bio?: string;
+    avatar?: string | null;
   };
   accessToken: string;
 }

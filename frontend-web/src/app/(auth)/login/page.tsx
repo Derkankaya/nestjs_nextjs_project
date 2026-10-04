@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Cookies from 'js-cookie';
 import { login } from '@/services/auth.service';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,12 +27,19 @@ export default function LoginPage() {
     try {
       const response = await login(formData);
       setAuth(response.user, response.accessToken);
-      // Save token to cookies for middleware to read
+      // Middleware'in okuyabilmesi için token'ı cookie'ye kaydet
       Cookies.set('token', response.accessToken, { expires: 1 });
-      router.push('/admin');
+
+      // Rola göre dinamik yönlendirme!
+      if (response.user.role === 'ADMIN') {
+        router.push('/admin');
+      } else {
+        router.push('/'); // Normal kullanıcılar anasayfaya yönlendirilir
+      }
+      
       router.refresh();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      setError(err.response?.data?.message || 'Giriş başarısız. Lütfen bilgilerinizi kontrol edip tekrar deneyin.');
     } finally {
       setLoading(false);
     }
@@ -44,13 +51,17 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-12">
+      <Link href="/" className="absolute top-6 left-6 flex items-center space-x-2 text-sm font-medium text-slate-500 hover:text-indigo-600 transition-colors">
+        <ArrowLeft className="w-4 h-4" />
+        <span>Ana Sayfaya Dön</span>
+      </Link>
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
         <div>
           <h2 className="text-3xl font-bold text-center text-slate-900">
-            Welcome Back
+            Tekrar Hoş Geldin
           </h2>
           <p className="mt-2 text-center text-sm text-slate-600">
-            Sign in to your account to continue
+            Devam etmek için hesabına giriş yap
           </p>
         </div>
 
@@ -63,7 +74,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
-              Email Address
+              E-posta Adresi
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
@@ -75,14 +86,14 @@ export default function LoginPage() {
                 value={formData.email}
                 onChange={handleChange}
                 className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                placeholder="you@example.com"
+                placeholder="ornek@email.com"
               />
             </div>
           </div>
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
-              Password
+              Şifre
             </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
@@ -119,12 +130,12 @@ export default function LoginPage() {
                 className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded"
               />
               <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600">
-                Remember me
+                Beni hatırla
               </label>
             </div>
             <div className="text-sm">
               <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500">
-                Forgot password?
+                Şifremi unuttum
               </a>
             </div>
           </div>
@@ -137,11 +148,11 @@ export default function LoginPage() {
             {loading ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Signing in...</span>
+                <span>Giriş yapılıyor...</span>
               </>
             ) : (
               <>
-                <span>Sign In</span>
+                <span>Giriş Yap</span>
                 <ArrowRight className="h-5 w-5" />
               </>
             )}
@@ -150,9 +161,9 @@ export default function LoginPage() {
 
         <div className="text-center">
           <p className="text-sm text-slate-600">
-            Don't have an account?{' '}
+            Hesabın yok mu?{' '}
             <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-              Register now
+              Hemen Kayıt Ol
             </Link>
           </p>
         </div>

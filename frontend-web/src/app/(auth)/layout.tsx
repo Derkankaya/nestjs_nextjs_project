@@ -1,4 +1,4 @@
-import '../styles/globals.css'; // Eğer CSS dosyan app klasöründeyse bu yol çalışır
+import '../styles/globals.css';
 
 export const metadata = {
   title: 'Login - Blog Template',
@@ -11,11 +11,9 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-slate-50 flex items-center justify-center">
-        {/* Auth sayfalarında Navbar veya Footer yok, sadece sayfanın kendisi var */}
-        {children}
-      </body>
-    </html>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center w-full">
+      {/* Navbar veya Footer yok, sadece auth sayfalarının içeriği var */}
+      {children}
+    </div>
   );
 }

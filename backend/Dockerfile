@@ -1,5 +1,5 @@
-# Temel imaj olarak Node.js 20 kullan
-FROM node:20-alpine
+# Temel imaj olarak Node.js 22 kullan
+FROM node:22-alpine
 
 # Çalışma dizinini ayarla
 WORKDIR /usr/src/app

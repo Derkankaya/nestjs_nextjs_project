@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { getPostBySlug, updatePost } from '@/services/post.service';
-import { getCategories } from '@/services/category.service';
+import { getPostById, updatePost, deletePost, updatePostStatus } from '@/services/post.service';
 import { Loader2, AlertCircle, Save, X } from 'lucide-react';
+import { getCategories } from '@/services/category.service';
+
 
 interface Category {
   id: string;
@@ -50,16 +51,16 @@ export default function AdminPostEditPage() {
     status: 'DRAFT',
   });
 
-  // Fetch categories and post data on mount
+  // Fetch categories and post data on mount using ID
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         const [categoriesData, postData] = await Promise.all([
           getCategories(),
-          getPostBySlug(id),
+          getPostById(id), // 👈 Artık ID ile çekiyoruz (Slug çakışması bitti!)
         ]);
-        setCategories(categoriesData);
+        setCategories(categoriesData.categories || categoriesData);
         setPost(postData as any);
 
         // Pre-fill form with post data
@@ -89,8 +90,10 @@ export default function AdminPostEditPage() {
     setSubmitting(true);
 
     try {
-      await updatePost(formData.slug, {
+      // 👈 Güncelleme artık SLUG yerine doğrudan post.id üzerinden atılıyor!
+      await updatePost(id, {
         title: formData.title,
+        slug: formData.slug,
         excerpt: formData.excerpt,
         content: formData.content,
         categoryId: formData.categoryId,

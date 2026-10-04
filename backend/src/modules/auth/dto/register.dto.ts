@@ -1,14 +1,18 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  username!: string;
+
   @IsEmail()
   email!: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(6, { message: 'Şifre en az 6 karakter olmalıdır' })
   password!: string;
-
-  @IsString()
-  @MinLength(2)
-  name!: string;
 }

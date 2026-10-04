@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Cookies from 'js-cookie'; 
 import { register } from '@/services/auth.service';
+import { useAuthStore } from '@/store/useAuthStore'; 
 import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function RegisterPage() {
@@ -13,6 +15,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: '',
+    username: '', // 🚨 YENİ EKLENDİ
     email: '',
     password: '',
     confirmPassword: '',
@@ -22,9 +25,14 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
 
-    // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError('Şifreler eşleşmiyor.');
+      return;
+    }
+
+    // Kullanıcı adı boşluk içeremez kontrolü
+    if (formData.username.includes(' ')) {
+      setError('Kullanıcı adı boşluk içeremez.');
       return;
     }
 
@@ -33,21 +41,40 @@ export default function RegisterPage() {
     try {
       const response = await register({
         name: formData.name,
+        username: formData.username, // 🚨 BACKEND'E GÖNDERİLİYOR
         email: formData.email,
         password: formData.password,
       });
-      // Auto-login after successful registration
-      router.push('/admin');
+
+      if (response && response.accessToken) {
+        useAuthStore.getState().setAuth(response.user, response.accessToken);
+        Cookies.set('token', response.accessToken, { expires: 1 });
+
+        if (response.user.role === 'ADMIN') {
+          router.push('/admin');
+        } else {
+          router.push('/');
+        }
+      } else {
+        router.push('/login');
+      }
+
       router.refresh();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      setError(err.response?.data?.message || 'Kayıt işlemi başarısız. Lütfen tekrar deneyin.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    // Kullanıcı adı alanını küçük harfe zorla ve Türkçe karakterleri engelle
+    if (e.target.name === 'username') {
+      const val = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      setFormData({ ...formData, [e.target.name]: val });
+    } else {
+      setFormData({ ...formData, [e.target.name]: e.target.value });
+    }
   };
 
   return (
@@ -55,10 +82,10 @@ export default function RegisterPage() {
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
         <div>
           <h2 className="text-3xl font-bold text-center text-slate-900">
-            Create Account
+            Hesap Oluştur
           </h2>
           <p className="mt-2 text-center text-sm text-slate-600">
-            Sign up to get started
+            Platforma katılmak için kayıt ol
           </p>
         </div>
 
@@ -69,9 +96,11 @@ export default function RegisterPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          
+          {/* Görünen İsim */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1">
-              Full Name
+              Görünen İsim
             </label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
@@ -83,14 +112,35 @@ export default function RegisterPage() {
                 value={formData.name}
                 onChange={handleChange}
                 className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                placeholder="John Doe"
+                placeholder="Örn: John Doe"
               />
             </div>
           </div>
 
+          {/* 🚨 YENİ: KULLANICI ADI (USERNAME) INPUTU */}
+          <div>
+            <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-1">
+              Kullanıcı Adı (URL'niz olacak)
+            </label>
+            <div className="relative flex items-center">
+              <span className="absolute left-4 text-slate-400 font-medium">@</span>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                value={formData.username}
+                onChange={handleChange}
+                className="w-full pl-9 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                placeholder="johndoe"
+              />
+            </div>
+          </div>
+
+          {/* Email */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
-              Email Address
+              E-posta Adresi
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
@@ -102,57 +152,46 @@ export default function RegisterPage() {
                 value={formData.email}
                 onChange={handleChange}
                 className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                placeholder="you@example.com"
+                placeholder="ornek@email.com"
               />
             </div>
           </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full pl-10 pr-12 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                placeholder="••••••••"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                {showPassword ? (
-                  <EyeOff className="h-5 w-5" />
-                ) : (
-                  <Eye className="h-5 w-5" />
-                )}
-              </button>
+          {/* Şifre */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">Şifre</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  placeholder="••••••••"
+                />
+              </div>
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-1">
-              Confirm Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                placeholder="••••••••"
-              />
+            
+            {/* Şifre Tekrar */}
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-1">Şifre Tekrar</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  placeholder="••••••••"
+                />
+              </div>
             </div>
           </div>
 
@@ -164,11 +203,11 @@ export default function RegisterPage() {
             {loading ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Creating account...</span>
+                <span>Hesap Oluşturuluyor...</span>
               </>
             ) : (
               <>
-                <span>Sign Up</span>
+                <span>Kayıt Ol</span>
                 <ArrowRight className="h-5 w-5" />
               </>
             )}
@@ -177,9 +216,9 @@ export default function RegisterPage() {
 
         <div className="text-center">
           <p className="text-sm text-slate-600">
-            Already have an account?{' '}
+            Zaten hesabın var mı?{' '}
             <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
-              Sign in
+              Giriş Yap
             </Link>
           </p>
         </div>

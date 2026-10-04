@@ -1,7 +1,11 @@
-import { getPostBySlug } from '@/services/post.service';
+import { getPostBySlug, getPosts } from '@/services/post.service'; 
 import PostCard from '@/components/ui/PostCard';
-import { Calendar, Clock, User, Tag, Folder } from 'lucide-react';
-import { notFound } from 'next/navigation'; // GÜVENLİK KALKANI: 404 Yönlendirmesi
+import { Calendar, Clock, User, Tag, Folder, Eye } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import LikeButton from '@/components/ui/LikeButton';
+import CommentSection from '@/components/ui/CommentSection';
+import BookmarkButton from '@/components/ui/BookmarkButton';
+import Link from 'next/link';
 
 interface PageProps {
   params: Promise<{
@@ -11,29 +15,41 @@ interface PageProps {
 
 async function PostPage(props: PageProps) {
   const params = await props.params;
-  
-  let post = null;
+  const slug = params.slug;
 
-  // 1. ZIRH: Backend çökerse veya makale gelmezse sistemi ayakta tut
+  let post: any = null;
+  let recentPosts: any[] = [];
+
   try {
-    post = await getPostBySlug(params.slug);
+    // 1. Ana yazıyı çek
+    post = await getPostBySlug(slug);
+    
+    // 2. Sidebar için son yazıları çek
+    if (post) {
+      const recentResponse = await getPosts({ limit: 3, status: 'PUBLISHED' });
+      const allRecent = Array.isArray(recentResponse) ? recentResponse : recentResponse?.posts || [];
+      // Şuan okuduğumuz yazıyı "Son Yazılar" arasından çıkarıp 2 tane alıyoruz
+      recentPosts = allRecent.filter((p: any) => p.id !== post.id).slice(0, 2);
+    }
   } catch (error) {
-    console.error("Yazı çekilirken hata oluştu:", error);
+    console.error("Veriler çekilirken hata oluştu:", error);
   }
 
-  // 2. ZIRH: Eğer post gerçekten yoksa, Next.js'in standart 404 (Not Found) sayfasına yönlendir
   if (!post) {
     notFound();
   }
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('tr-TR', {
       month: 'long',
       day: 'numeric',
       year: 'numeric',
     });
   };
+
+  const totalLikes = post.likes?.length || 0;
+  const initialIsLiked = false; 
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -41,11 +57,13 @@ async function PostPage(props: PageProps) {
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="max-w-3xl">
+            
+            {/* Meta Bilgileri */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
               {post.category && (
                 <a
                   href={`/categories/${post.category.slug}`}
-                  className="flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 text-sm font-medium"
+                  className="flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 text-sm font-medium hover:bg-indigo-200 transition-colors"
                 >
                   <Folder className="h-4 w-4" />
                   <span>{post.category.name}</span>
@@ -57,24 +75,48 @@ async function PostPage(props: PageProps) {
               </span>
               <span className="flex items-center space-x-2 text-slate-500 text-sm">
                 <Clock className="h-4 w-4" />
-                <span>{post.estimatedReadingTime} min read</span>
+                <span>{post.estimatedReadingTime} dk okuma</span>
               </span>
-            </div>
+              <span className="flex items-center space-x-2 text-slate-500 text-sm font-medium">
+                <Eye className="h-4 w-4" />
+                <span>{post.viewCount || 0} görüntülenme</span>
+              </span>
+            </div> 
 
             <h1 className="text-3xl md:text-5xl font-bold text-slate-900 mb-6 leading-tight">
               {post.title}
             </h1>
 
-            <div className="flex items-center space-x-4 border-t border-slate-200 pt-6">
-              <div className="flex items-center space-x-3">
-                <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <User className="h-6 w-6 text-indigo-600" />
+            {/* Yazar ve Aksiyon Butonları (Like & Bookmark) */}
+            <div className="flex items-center justify-between border-t border-slate-200 pt-6">
+              
+              {/* Sol: Yazar Profil */}
+              <Link href={`/author/${post.author.username}`} className="flex items-center space-x-3 group cursor-pointer">
+                <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden border border-transparent group-hover:border-indigo-500 transition-colors">
+                  {post.author?.avatar ? (
+                    <img src={post.author.avatar} alt={post.author.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <User className="h-6 w-6 text-indigo-600" />
+                  )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{post.author.name}</p>
-                  <p className="text-xs text-slate-500">Author</p>
+                  <p className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{post.author.name}</p>
+                  <p className="text-xs text-slate-500">{post.author.role || 'Yazar'}</p>
                 </div>
+              </Link>
+              {/* Sağ: Butonlar */}
+              <div className="flex items-center space-x-2">
+                <LikeButton 
+                  postId={post.id} 
+                  initialLikesCount={totalLikes} 
+                  initialIsLiked={initialIsLiked} 
+                />
+                <BookmarkButton 
+                  postId={post.id} 
+                  initialIsBookmarked={false} 
+                />
               </div>
+
             </div>
           </div>
         </div>
@@ -83,7 +125,8 @@ async function PostPage(props: PageProps) {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          {/* Post Content */}
+          
+          {/* Sol Kolon: Post İçeriği */}
           <div className="lg:col-span-8">
             {post.coverImage && (
               <div className="rounded-2xl overflow-hidden mb-8 shadow-lg">
@@ -100,15 +143,15 @@ async function PostPage(props: PageProps) {
               dangerouslySetInnerHTML={{ __html: post.content }}
             />
 
-            {/* Tags */}
+            {/* Temizlenmiş ve Tekilleştirilmiş Etiketler */}
             {post.tags && post.tags.length > 0 && (
               <div className="mt-12 pt-8 border-t border-slate-200">
-                <h3 className="text-sm font-semibold text-slate-900 mb-4">Tags</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-4">Etiketler</h3>
                 <div className="flex flex-wrap gap-2">
                   {post.tags.map((tag: any) => (
                     <a
-                      key={tag.slug}
-                      href={`/tags/${tag.slug}`}
+                      key={tag.id}
+                      href={`/tags/${tag.id}`}
                       className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-colors"
                     >
                       <Tag className="h-4 w-4" />
@@ -118,57 +161,66 @@ async function PostPage(props: PageProps) {
                 </div>
               </div>
             )}
+
+            {/* Yorumlar Bölümü */}
+            <CommentSection 
+              postId={post.id} 
+              initialComments={post.comments || []} 
+            />
+            
           </div>
 
-          {/* Sidebar */}
+          {/* Sağ Kolon: Dinamik Sidebar */}
           <div className="lg:col-span-4">
-            <div className="sticky top-8 space-y-6">
-              {/* Author Card */}
+            <div className="sticky top-24 space-y-6">
+              
+              {/* Dinamik Yazar Hakkında */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">About Author</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Yazar Hakkında</h3>
                 <div className="flex items-center space-x-4">
-                  <div className="h-16 w-16 rounded-full bg-indigo-100 flex items-center justify-center">
-                    <User className="h-8 w-8 text-indigo-600" />
+                  <div className="h-16 w-16 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden">
+                    {post.author?.avatar ? (
+                      <img src={post.author.avatar} alt={post.author.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <User className="h-8 w-8 text-indigo-600" />
+                    )}
                   </div>
                   <div>
-                    <p className="font-medium text-slate-900">{post.author.name}</p>
-                    <p className="text-sm text-slate-500">Full Stack Developer</p>
+                    <p className="font-bold text-slate-900">{post.author.name}</p>
+                    <p className="text-sm text-slate-500">{post.author.role || 'Editör'}</p>
                   </div>
                 </div>
                 <p className="mt-4 text-sm text-slate-600">
-                  Passionate about building modern web applications and sharing knowledge
-                  with the community.
+                  {post.author.bio || 'Modern web teknolojileri üzerine yazılar yazan ve deneyimlerini toplulukla paylaşan bir teknoloji tutkunu.'}
                 </p>
               </div>
 
-              {/* Recent Posts Placeholder (TypeScript hataları giderildi) */}
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Posts</h3>
-                <div className="space-y-4">
-                  <PostCard
-                    id="1"
-                    title="Getting Started with Next.js 14"
-                    excerpt="Learn the basics of Next.js and how to build your first application."
-                    category={{ name: 'Development', slug: 'development' }}
-                    estimatedReadingTime={5}
-                    slug="/posts/getting-started-with-nextjs"
-                    createdAt={new Date().toISOString()}
-                    coverImage={null}
-                  />
-                  <PostCard
-                    id="2"
-                    title="Understanding React Server Components"
-                    excerpt="A deep dive into React Server Components and how they change the way we build apps."
-                    category={{ name: 'Development', slug: 'development' }}
-                    estimatedReadingTime={8}
-                    slug="/posts/react-server-components"
-                    createdAt={new Date().toISOString()}
-                    coverImage={null}
-                  />
+              {/* Dinamik Son Yazılar (Bulunduğumuz yazı hariç) */}
+              {recentPosts.length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">İlgini Çekebilir</h3>
+                  <div className="space-y-4">
+                    {recentPosts.map((recent: any) => (
+                      <PostCard
+                        key={recent.id}
+                        id={recent.id}
+                        title={recent.title}
+                        excerpt={recent.excerpt || 'Özet bulunmuyor.'}
+                        category={recent.category}
+                        estimatedReadingTime={recent.estimatedReadingTime}
+                        slug={recent.slug}
+                        createdAt={recent.createdAt}
+                        coverImage={recent.coverImage}
+                        viewCount={recent.viewCount}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
             </div>
           </div>
+          
         </div>
       </div>
     </div>

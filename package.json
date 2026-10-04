@@ -2,8 +2,10 @@
   "dependencies": {
     "isomorphic-dompurify": "^3.22.0",
     "js-cookie": "^3.0.8"
+
   },
   "devDependencies": {
     "@types/js-cookie": "^3.0.6"
+
   }
 }

@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { slugify } from '../../common/utils/slug';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -15,19 +10,10 @@ export class CategoriesService {
 
   async create(dto: CreateCategoryDto) {
     const slug = dto.slug?.trim() ? slugify(dto.slug) : slugify(dto.name);
-
-    try {
-      return await this.prisma.category.create({
-        data: {
-          name: dto.name,
-          slug,
-          description: dto.description,
-        },
-      });
-    } catch (error) {
-      this.handleUniqueConflict(error);
-      throw error;
-    }
+    // Hata olursa bırak patlasın, PrismaExceptionFilter onu havada yakalayacak!
+    return await this.prisma.category.create({
+      data: { name: dto.name, slug, description: dto.description },
+    });
   }
 
   findAll() {
@@ -42,11 +28,7 @@ export class CategoriesService {
       where: { id },
       include: { _count: { select: { posts: true } } },
     });
-
-    if (!category) {
-      throw new NotFoundException(`Category ${id} not found`);
-    }
-
+    if (!category) throw new NotFoundException(`Category ${id} not found`);
     return category;
   }
 
@@ -55,49 +37,22 @@ export class CategoriesService {
       where: { slug },
       include: { _count: { select: { posts: true } } },
     });
-
-    if (!category) {
-      throw new NotFoundException(`Category slug "${slug}" not found`);
-    }
-
+    if (!category) throw new NotFoundException(`Category slug "${slug}" not found`);
     return category;
   }
 
   async update(id: string, dto: UpdateCategoryDto) {
-    await this.findById(id);
+    await this.findById(id); // Varlığını kontrol et
+    const slug = dto.slug ? slugify(dto.slug) : dto.name ? slugify(dto.name) : undefined;
 
-    const slug = dto.slug
-      ? slugify(dto.slug)
-      : dto.name
-        ? slugify(dto.name)
-        : undefined;
-
-    try {
-      return await this.prisma.category.update({
-        where: { id },
-        data: {
-          name: dto.name,
-          slug,
-          description: dto.description,
-        },
-      });
-    } catch (error) {
-      this.handleUniqueConflict(error);
-      throw error;
-    }
+    return await this.prisma.category.update({
+      where: { id },
+      data: { name: dto.name, slug, description: dto.description },
+    });
   }
 
   async remove(id: string) {
     await this.findById(id);
-    await this.prisma.category.delete({ where: { id } });
-  }
-
-  private handleUniqueConflict(error: unknown): void {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002'
-    ) {
-      throw new ConflictException('Category slug must be unique');
-    }
+    return await this.prisma.category.delete({ where: { id } });
   }
 }

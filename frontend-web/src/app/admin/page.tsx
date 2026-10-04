@@ -1,7 +1,10 @@
+'use client';
+
 import { FileText, Users, Eye, MessageSquare } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AdminDashboardPage() {
-  // Mock stats - will be replaced with real API calls later
+  // Mock stats - Her karta 'href' rotası eklendi
   const stats = [
     {
       name: 'Total Posts',
@@ -9,6 +12,7 @@ export default function AdminDashboardPage() {
       icon: FileText,
       color: 'bg-blue-500',
       trend: '+5 this week',
+      href: '/admin/posts',
     },
     {
       name: 'Total Views',
@@ -16,6 +20,7 @@ export default function AdminDashboardPage() {
       icon: Eye,
       color: 'bg-green-500',
       trend: '+23% this month',
+      href: '/admin/posts', // Görüntülenmeler de yazılarla ilgili olduğu için postlara yönlendirdik
     },
     {
       name: 'Total Comments',
@@ -23,6 +28,7 @@ export default function AdminDashboardPage() {
       icon: MessageSquare,
       color: 'bg-purple-500',
       trend: '-12% this week',
+      href: '/admin/comments',
     },
     {
       name: 'Total Users',
@@ -30,8 +36,10 @@ export default function AdminDashboardPage() {
       icon: Users,
       color: 'bg-orange-500',
       trend: '+18 this month',
+      href: '/admin/users',
     },
   ];
+  
 
   const recentPosts = [
     {
@@ -76,43 +84,45 @@ export default function AdminDashboardPage() {
         <p className="text-slate-600 mt-1">Welcome back! Here's what's happening today.</p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Div'ler Link'e çevrildi ve animasyon eklendi */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div
+            <Link
+              href={stat.href}
               key={stat.name}
-              className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow"
+              className="group block bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-500">{stat.name}</p>
+                  <p className="text-sm font-medium text-slate-500 group-hover:text-indigo-600 transition-colors">{stat.name}</p>
                   <p className="text-3xl font-bold text-slate-900 mt-2">{stat.value}</p>
                 </div>
-                <div className={`${stat.color} p-3 rounded-lg`}>
+                <div className={`${stat.color} p-3 rounded-lg shadow-sm group-hover:scale-110 transition-transform duration-300`}>
                   <Icon className="h-6 w-6 text-white" />
                 </div>
               </div>
               <p className="text-xs text-slate-500 mt-4">{stat.trend}</p>
-            </div>
+            </Link>
           );
         })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Recent Posts */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
           <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Recent Posts</h2>
-            <a href="/admin/posts" className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+            {/* Eski a etiketi Link ile değiştirildi */}
+            <Link href="/admin/posts" className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
               View All
-            </a>
+            </Link>
           </div>
           <div className="p-6">
             <div className="space-y-4">
               {recentPosts.map((post) => (
-                <div key={post.id} className="flex items-start justify-between pb-4 last:pb-0 border-b border-slate-100 last:border-0">
+                <div key={post.id} className="flex items-start justify-between pb-4 last:pb-0 border-b border-slate-100 last:border-0 hover:bg-slate-50 p-2 rounded-lg transition-colors cursor-pointer">
                   <div>
                     <h3 className="font-medium text-slate-900 mb-1">{post.title}</h3>
                     <div className="flex items-center space-x-3 text-sm text-slate-500">
@@ -139,16 +149,17 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Recent Comments */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
           <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Recent Comments</h2>
-            <a href="/admin/comments" className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+            {/* Eski a etiketi Link ile değiştirildi */}
+            <Link href="/admin/comments" className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
               View All
-            </a>
+            </Link>
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              <div className="flex items-start space-x-3">
+              <div className="flex items-start space-x-3 hover:bg-slate-50 p-2 rounded-lg transition-colors cursor-pointer">
                 <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-sm">
                   JD
                 </div>
@@ -160,7 +171,7 @@ export default function AdminDashboardPage() {
                   <p className="text-xs text-slate-400 mt-2">2 hours ago</p>
                 </div>
               </div>
-              <div className="flex items-start space-x-3">
+              <div className="flex items-start space-x-3 hover:bg-slate-50 p-2 rounded-lg transition-colors cursor-pointer">
                 <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-semibold text-sm">
                   AS
                 </div>
@@ -172,7 +183,7 @@ export default function AdminDashboardPage() {
                   <p className="text-xs text-slate-400 mt-2">4 hours ago</p>
                 </div>
               </div>
-              <div className="flex items-start space-x-3">
+              <div className="flex items-start space-x-3 hover:bg-slate-50 p-2 rounded-lg transition-colors cursor-pointer">
                 <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-semibold text-sm">
                   RW
                 </div>

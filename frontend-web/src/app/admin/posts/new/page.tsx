@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPost } from '@/services/post.service';
 import { getCategories } from '@/services/category.service';
+import { useAuthStore } from '@/store/useAuthStore'; // Auth store eklendi
 import { Loader2, AlertCircle, Save, X } from 'lucide-react';
+
 
 interface Category {
   id: string;
@@ -14,6 +16,7 @@ interface Category {
 
 export default function AdminPostNewPage() {
   const router = useRouter();
+  const { user } = useAuthStore(); // Kullanıcı bilgisi alındı
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -30,19 +33,18 @@ export default function AdminPostNewPage() {
     status: 'DRAFT',
   });
 
-  useState<Category[]>([]);
-
   // Fetch categories on mount
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const data = await getCategories();
-        setCategories(data);
-        setLoading(false);
-      } catch (err) {
-        setError('Failed to load categories');
-        setLoading(false);
-      }
+          const data = await getCategories();
+          const categoriesList = Array.isArray(data) ? data : (data as any)?.categories || [];
+          setCategories(categoriesList);
+          setLoading(false);
+        } catch (err) {
+    setError('Failed to load categories');
+    setLoading(false);
+}
     };
     fetchCategories();
   }, []);
@@ -50,13 +52,21 @@ export default function AdminPostNewPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Güvenlik kontrolü: Kullanıcı ID yoksa hata ver
+    if (!user?.id) {
+      setError('User session not found. Please log in again.');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       await createPost({
         ...formData,
-        status: formData.status as 'PUBLISHED' | 'DRAFT'
-        });
+        authorId: user.id, // <-- authorId burada istek gövdesine ekleniyor
+        status: formData.status as 'PUBLISHED' | 'DRAFT',
+      });
       setSuccess(true);
       setTimeout(() => {
         router.push('/admin/posts');

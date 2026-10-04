@@ -1,15 +1,5 @@
 import { PostStatus } from '@prisma/client';
-import {
-  IsArray,
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  IsUUID,
-  MaxLength,
-  Min,
-  MinLength,
-} from 'class-validator';
+import { IsArray, IsEnum, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength } from 'class-validator';
 
 export class CreatePostDto {
   @IsString()
@@ -53,8 +43,10 @@ export class CreatePostDto {
   @MaxLength(160)
   metaDescription?: string;
 
+  // 🚨 GÜVENLİK: Artık zorunlu değil. Frontend gönderse bile backend token'dakini ezecek.
+  @IsOptional()
   @IsUUID()
-  authorId!: string;
+  authorId?: string;
 
   @IsOptional()
   @IsUUID()

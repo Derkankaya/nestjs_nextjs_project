@@ -7,12 +7,12 @@ import { Check, X, Trash2, Loader2, AlertCircle, MessageSquare } from 'lucide-re
 interface Comment {
   id: string;
   content: string;
-  author: {
+  author?: {
     name: string;
     email: string;
     avatar: string | null;
   };
-  post: {
+  post?: {
     id: string;
     title: string;
     slug: string;
@@ -21,13 +21,8 @@ interface Comment {
   createdAt: string;
 }
 
-interface CommentResponse {
-  comments: Comment[];
-  total: number;
-}
-
 export default function AdminCommentsPage() {
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [allComments, setAllComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -35,19 +30,25 @@ export default function AdminCommentsPage() {
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Sadece sayfa ilk açıldığında tüm yorumları çekeriz
   useEffect(() => {
     fetchComments();
-  }, [filter]);
+  }, []);
 
   const fetchComments = async () => {
     try {
       setLoading(true);
-      const response = await getComments(filter === 'ALL' ? undefined : filter);
-      setComments(response.comments);
+      // Bütün yorumları tek seferde çekiyoruz ki sekmeler arası geçiş ışık hızında olsun
+      const response = await getComments(undefined, 1000, 0); 
+      
+      // 🚨 Veri sarmalama kalkanı eklendi
+      const fetchedComments = Array.isArray(response) ? response : response?.comments || [];
+      setAllComments(fetchedComments);
       setError('');
     } catch (err: any) {
       setError('Failed to fetch comments. Please try again.');
       console.error(err);
+      setAllComments([]);
     } finally {
       setLoading(false);
     }
@@ -56,8 +57,8 @@ export default function AdminCommentsPage() {
   const handleApprove = async (id: string) => {
     try {
       const updatedComment = await approveComment(id);
-      setComments((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, status: updatedComment.status } : c))
+      setAllComments((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, status: updatedComment?.status || 'APPROVED' } : c))
       );
     } catch (err: any) {
       setError('Failed to approve comment');
@@ -68,8 +69,8 @@ export default function AdminCommentsPage() {
   const handleReject = async (id: string) => {
     try {
       const updatedComment = await rejectComment(id);
-      setComments((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, status: updatedComment.status } : c))
+      setAllComments((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, status: updatedComment?.status || 'REJECTED' } : c))
       );
     } catch (err: any) {
       setError('Failed to reject comment');
@@ -80,7 +81,7 @@ export default function AdminCommentsPage() {
   const handleDelete = async (id: string) => {
     try {
       await deleteComment(id);
-      setComments((prev) => prev.filter((c) => c.id !== id));
+      setAllComments((prev) => prev.filter((c) => c.id !== id));
       setConfirmDelete(null);
     } catch (err: any) {
       setError('Failed to delete comment');
@@ -88,14 +89,17 @@ export default function AdminCommentsPage() {
     }
   };
 
-  // Filter by search term
-  const filteredComments = comments.filter((comment) =>
-    comment.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    comment.author.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    comment.post.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // 1. Önce sekme filtresini (Status), sonra arama filtresini uyguluyoruz
+  const filteredComments = allComments
+    .filter((comment) => filter === 'ALL' || comment.status === filter)
+    .filter((comment) =>
+      comment?.content?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      comment?.author?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      comment?.post?.title?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -118,19 +122,6 @@ export default function AdminCommentsPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return 'text-yellow-600';
-      case 'APPROVED':
-        return 'text-green-600';
-      case 'REJECTED':
-        return 'text-red-600';
-      default:
-        return 'text-slate-600';
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -141,23 +132,25 @@ export default function AdminCommentsPage() {
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg">
+      {/* Filter Tabs - Sayılar düzeltildi */}
+      <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg w-max max-w-full overflow-x-auto">
         {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status as any)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex items-center ${
               filter === status
                 ? 'bg-white shadow text-slate-900'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             {status}
-            <span className="ml-2 bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-xs">
-              {filter === status
-                ? comments.filter((c) => filter === 'ALL' || c.status === status).length
-                : comments.filter((c) => filter === 'ALL' || c.status === status).length}
+            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${
+               filter === status ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'
+            }`}>
+              {status === 'ALL' 
+                ? allComments.length 
+                : allComments.filter(c => c.status === status).length}
             </span>
           </button>
         ))}
@@ -168,7 +161,7 @@ export default function AdminCommentsPage() {
         <MessageSquare className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
         <input
           type="text"
-          placeholder="Search comments..."
+          placeholder="Search comments by content, author, or post title..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -195,7 +188,7 @@ export default function AdminCommentsPage() {
             <MessageSquare className="h-12 w-12 text-slate-300 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-slate-900">No comments found</h3>
             <p className="text-slate-500 mt-1">
-              {searchTerm ? 'Try adjusting your search terms' : 'No comments yet'}
+              {searchTerm || filter !== 'ALL' ? 'Try adjusting your filters' : 'No comments yet'}
             </p>
           </div>
         ) : (
@@ -225,19 +218,25 @@ export default function AdminCommentsPage() {
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {filteredComments.map((comment) => (
-                  <tr key={comment.id} className="hover:bg-slate-50">
+                  <tr key={comment.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
-                      <p className="text-sm text-slate-900 line-clamp-2">{comment.content}</p>
+                      <p className="text-sm text-slate-900 line-clamp-2 max-w-xs" title={comment.content}>
+                        {comment.content}
+                      </p>
                     </td>
                     <td className="px-6 py-4">
                       <div>
-                        <p className="text-sm font-medium text-slate-900">{comment.author.name}</p>
-                        <p className="text-xs text-slate-500">{comment.author.email}</p>
+                        <p className="text-sm font-medium text-slate-900">{comment.author?.name || 'Unknown'}</p>
+                        <p className="text-xs text-slate-500">{comment.author?.email || '-'}</p>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-slate-900">{comment.post.title}</p>
-                      <p className="text-xs text-slate-500">{comment.post.slug}</p>
+                      <div className="max-w-[150px]">
+                        <p className="text-sm text-slate-900 truncate" title={comment.post?.title}>
+                          {comment.post?.title || 'Unknown Post'}
+                        </p>
+                        <p className="text-xs text-slate-500 truncate">{comment.post?.slug || '-'}</p>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span
@@ -246,7 +245,7 @@ export default function AdminCommentsPage() {
                         {comment.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-500">
+                    <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">
                       {formatDate(comment.createdAt)}
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -255,14 +254,14 @@ export default function AdminCommentsPage() {
                           <>
                             <button
                               onClick={() => handleApprove(comment.id)}
-                              className="text-green-600 hover:text-green-900 p-1"
+                              className="text-green-600 hover:text-green-900 hover:bg-green-50 p-1.5 rounded transition-colors"
                               title="Approve"
                             >
                               <Check className="h-5 w-5" />
                             </button>
                             <button
                               onClick={() => handleReject(comment.id)}
-                              className="text-red-600 hover:text-red-900 p-1"
+                              className="text-orange-600 hover:text-orange-900 hover:bg-orange-50 p-1.5 rounded transition-colors"
                               title="Reject"
                             >
                               <X className="h-5 w-5" />
@@ -271,7 +270,7 @@ export default function AdminCommentsPage() {
                         )}
                         <button
                           onClick={() => setConfirmDelete(comment.id)}
-                          className="text-red-600 hover:text-red-900 p-1"
+                          className="text-red-600 hover:text-red-900 hover:bg-red-50 p-1.5 rounded transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="h-5 w-5" />
@@ -300,13 +299,13 @@ export default function AdminCommentsPage() {
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setConfirmDelete(null)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => handleDelete(confirmDelete)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
                 >
                   Delete
                 </button>

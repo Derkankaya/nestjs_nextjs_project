@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getPosts, deletePost } from '@/services/post.service';
-import { Edit, Trash2, Plus, Search, Eye, Loader2, AlertCircle } from 'lucide-react';
+import { Edit, Trash2, Plus, Search, Eye, Loader2, AlertCircle, FileEdit, LayoutList } from 'lucide-react';
 import Link from 'next/link';
 
 interface Post {
@@ -12,7 +12,7 @@ interface Post {
   slug: string;
   excerpt: string;
   status: 'PUBLISHED' | 'DRAFT';
-  category: {
+  category?: {
     name: string;
     slug: string;
   };
@@ -26,29 +26,42 @@ export default function AdminPostsPage() {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  
+  // 👈 1. YENİ: Sekme State'i eklendi
+  const [activeTab, setActiveTab] = useState<'ALL' | 'PUBLISHED' | 'DRAFT'>('ALL');
 
+  // 👈 2. YENİ: activeTab değiştiğinde verileri baştan çekmesi için dependency eklendi
   useEffect(() => {
     fetchPosts();
-  }, []);
+  }, [activeTab]); 
 
   const fetchPosts = async () => {
     try {
       setLoading(true);
-      const response = await getPosts(100, 0);
-      setPosts(response.posts);
+      
+      // 👈 3. YENİ: Backend'e gönderilecek parametreleri ayarlıyoruz
+      const queryParams: any = { limit: 100, offset: 0 };
+      if (activeTab !== 'ALL') {
+        queryParams.status = activeTab; // Sadece ALL değilse status gönder
+      }
+
+      const response = await getPosts(queryParams);
+      const postData = Array.isArray(response) ? response : response?.posts || [];
+      setPosts(postData);
       setError('');
     } catch (err: any) {
       setError('Failed to fetch posts. Please try again.');
       console.error(err);
+      setPosts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (slug: string) => {
+  const handleDelete = async (id: string) => {
     try {
-      await deletePost(slug);
-      setPosts((prev) => prev.filter((post) => post.slug !== slug));
+      await deletePost(id);
+      setPosts((prev) => prev.filter((post) => post.id !== id));
       setConfirmDelete(null);
     } catch (err: any) {
       setError('Failed to delete post. Please try again.');
@@ -57,10 +70,11 @@ export default function AdminPostsPage() {
   };
 
   const filteredPosts = posts.filter((post) =>
-    post.title.toLowerCase().includes(searchTerm.toLowerCase())
+    post?.title?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -83,6 +97,37 @@ export default function AdminPostsPage() {
           <Plus className="h-5 w-5" />
           <span>Create Post</span>
         </Link>
+      </div>
+
+      {/* 👈 4. YENİ: Sekmeler (Tabs) UI Kısmı eklendi */}
+      <div className="flex space-x-1 border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab('ALL')}
+          className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center space-x-2 ${
+            activeTab === 'ALL' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <LayoutList className="h-4 w-4" />
+          <span>All Posts</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('PUBLISHED')}
+          className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center space-x-2 ${
+            activeTab === 'PUBLISHED' ? 'border-green-600 text-green-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Eye className="h-4 w-4" />
+          <span>Published</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('DRAFT')}
+          className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center space-x-2 ${
+            activeTab === 'DRAFT' ? 'border-yellow-500 text-yellow-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <FileEdit className="h-4 w-4" />
+          <span>Drafts</span>
+        </button>
       </div>
 
       {/* Search */}
@@ -117,7 +162,7 @@ export default function AdminPostsPage() {
             <AlertCircle className="h-12 w-12 text-slate-300 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-slate-900">No posts found</h3>
             <p className="text-slate-500 mt-1">
-              {searchTerm ? 'Try adjusting your search terms' : 'Create your first post'}
+              {searchTerm ? 'Try adjusting your search terms' : activeTab === 'ALL' ? 'Create your first post' : `No ${activeTab.toLowerCase()} posts found`}
             </p>
           </div>
         ) : (
@@ -157,7 +202,7 @@ export default function AdminPostsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                        {post.category.name}
+                        {post.category?.name || 'Uncategorized'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -177,7 +222,7 @@ export default function AdminPostsPage() {
                     <td className="px-6 py-4 text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">
                         <Link
-                          href={`/admin/posts/${post.slug}/edit`}
+                          href={`/admin/posts/${post.id}/edit`} // 👈 BURAYI AYARLAMIŞTIK, DÜZELTTİM: /edit kaldırılmalı mı klasör yapına göre kontrol et!
                           className="text-indigo-600 hover:text-indigo-900 p-1"
                           title="Edit"
                         >
@@ -192,7 +237,7 @@ export default function AdminPostsPage() {
                           <Eye className="h-5 w-5" />
                         </Link>
                         <button
-                          onClick={() => setConfirmDelete(post.slug)}
+                          onClick={() => setConfirmDelete(post.id)}
                           className="text-red-600 hover:text-red-900 p-1"
                           title="Delete"
                         >

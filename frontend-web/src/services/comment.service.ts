@@ -26,10 +26,11 @@ export interface CommentResponse {
 export const getComments = async (
   status?: 'PENDING' | 'APPROVED' | 'REJECTED',
   limit: number = 10,
-  offset: number = 0
+  offset: number = 0,
+  postId?: string
 ): Promise<CommentResponse> => {
   const response = await api.get<CommentResponse>('/comments', {
-    params: { status, limit, offset },
+    params: { status, limit, offset, postId },
   });
   return response.data;
 };
@@ -44,19 +45,22 @@ export const getApprovedComments = async (limit: number = 10, offset: number = 0
   return getComments('APPROVED', limit, offset);
 };
 
-// Approve a comment
+// Admin: Moderate a comment (Backend'deki /comments/:id/moderate rotası ile tam uyumlu)
+export const moderateComment = async (id: string, status: 'APPROVED' | 'REJECTED'): Promise<Comment> => {
+  const response = await api.patch<Comment>(`/comments/${id}/moderate`, { status });
+  return response.data;
+};
+
+// Kolaylık olması için approve ve reject fonksiyonlarını da moderate üzerinden çalıştırıyoruz
 export const approveComment = async (id: string): Promise<Comment> => {
-  const response = await api.patch<Comment>(`/comments/${id}/approve`);
-  return response.data;
+  return moderateComment(id, 'APPROVED');
 };
 
-// Reject a comment
 export const rejectComment = async (id: string): Promise<Comment> => {
-  const response = await api.patch<Comment>(`/comments/${id}/reject`);
-  return response.data;
+  return moderateComment(id, 'REJECTED');
 };
 
-// Delete a comment
+// Delete a comment (Zaten ID alıyordu, kusursuz)
 export const deleteComment = async (id: string): Promise<void> => {
   await api.delete(`/comments/${id}`);
 };

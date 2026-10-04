@@ -1,83 +1,67 @@
 import {
-  BadRequestException,
-  ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { CreateMediaDto } from './dto/create-media.dto';
-import { UpdateMediaDto } from './dto/update-media.dto';
+  UnauthorizedException,
+} from "@nestjs/common";
+import { PrismaService } from "../../common/prisma/prisma.service";
+import { CreateMediaDto } from "./dto/create-media.dto";
+import { UpdateMediaDto } from "./dto/update-media.dto";
 
 @Injectable()
 export class MediaService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateMediaDto) {
-    await this.assertUserExists(dto.userId);
+  async create(dto: CreateMediaDto, user: any) {
+    // 🚨 GÜVENLİK: DTO'dan gelen userId'yi eziyoruz.
+    // Sadece token'ın sahibi kimse, medya onun adına yüklenir!
+    dto.userId = user.id;
 
-    try {
-      return await this.prisma.media.create({ data: dto });
-    } catch (error) {
-      this.handleUniqueConflict(error);
-      throw error;
-    }
+    // Hata yakalamayı Global Filter'a (PrismaExceptionFilter) bıraktık.
+    return await this.prisma.media.create({ data: dto });
   }
 
-  findAll(userId?: string) {
-    return this.prisma.media.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
+  // 🌟 SAYFALAMA EKLENDİ
+  async findAll(userId?: string, limit = 20, offset = 0) {
+    const where = { userId };
+
+    const [media, total] = await Promise.all([
+      this.prisma.media.findMany({
+        where,
+        take: limit,
+        skip: offset,
+        orderBy: { createdAt: "desc" },
+      }),
+      this.prisma.media.count({ where }),
+    ]);
+
+    return { media, total };
   }
 
   async findById(id: string) {
     const media = await this.prisma.media.findUnique({ where: { id } });
-
-    if (!media) {
-      throw new NotFoundException(`Media ${id} not found`);
-    }
-
+    if (!media) throw new NotFoundException(`Media ${id} not found`);
     return media;
   }
 
-  async update(id: string, dto: UpdateMediaDto) {
-    await this.findById(id);
+  async update(id: string, dto: UpdateMediaDto, user: any) {
+    const media = await this.findById(id);
 
-    if (dto.userId) {
-      await this.assertUserExists(dto.userId);
+    // 🚨 YETKİ KONTROLÜ: Sadece sahibi veya ADMIN güncelleyebilir
+    if (media.userId !== user.id && user.role !== "ADMIN") {
+      throw new ForbiddenException("Bu medyayı güncelleme yetkiniz yok!");
     }
 
-    try {
-      return await this.prisma.media.update({ where: { id }, data: dto });
-    } catch (error) {
-      this.handleUniqueConflict(error);
-      throw error;
-    }
+    return await this.prisma.media.update({ where: { id }, data: dto });
   }
 
-  async remove(id: string) {
-    await this.findById(id);
+  async remove(id: string, user: any) {
+    const media = await this.findById(id);
+
+    // 🚨 YETKİ KONTROLÜ: Sadece sahibi veya ADMIN silebilir
+    if (media.userId !== user.id && user.role !== "ADMIN") {
+      throw new ForbiddenException("Bu medyayı silme yetkiniz yok!");
+    }
     await this.prisma.media.delete({ where: { id } });
-  }
-
-  private async assertUserExists(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true },
-    });
-
-    if (!user) {
-      throw new BadRequestException(`User ${userId} not found`);
-    }
-  }
-
-  private handleUniqueConflict(error: unknown): void {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002'
-    ) {
-      throw new ConflictException('Media fileKey must be unique');
-    }
   }
 }

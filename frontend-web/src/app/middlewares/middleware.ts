@@ -4,17 +4,13 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
   const { pathname } = request.nextUrl;
 
-  // If user is authenticated
-  if (token) {
-    // Redirect from login/register to admin if they try to access auth pages
-    if (pathname === '/login' || pathname === '/register') {
-      return NextResponse.redirect(new URL('/admin', request.url));
-    }
-    return NextResponse.next();
+  // 1. Eğer kullanıcı giriş yapmışsa ve login/register sayfasına gitmek istiyorsa -> /admin'e at
+  if (token && (pathname === '/login' || pathname === '/register')) {
+    return NextResponse.redirect(new URL('/admin', request.url));
   }
 
-  // If user is not authenticated and trying to access admin routes
-  if (pathname.startsWith('/admin')) {
+  // 2. Eğer kullanıcı giriş yapmamışsa ve /admin sayfalarına girmek istiyorsa -> /login'e at
+  if (!token && pathname.startsWith('/admin')) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

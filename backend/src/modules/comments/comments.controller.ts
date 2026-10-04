@@ -10,54 +10,89 @@ import {
   Patch,
   Post,
   Query,
-} from '@nestjs/common';
-import { CommentStatus } from '@prisma/client';
-import { CommentsService } from './comments.service';
-import { CreateCommentDto } from './dto/create-comment.dto';
-import { ModerateCommentDto } from './dto/moderate-comment.dto';
-import { UpdateCommentDto } from './dto/update-comment.dto';
+  UseGuards,
+  Req,
+} from "@nestjs/common";
+import { CommentStatus } from "@prisma/client";
+import { CommentsService } from "./comments.service";
+import { CreateCommentDto } from "./dto/create-comment.dto";
+import { ModerateCommentDto } from "./dto/moderate-comment.dto";
+import { UpdateCommentDto } from "./dto/update-comment.dto";
+import { AuthGuard } from "../auth/auth.guard";
+import { RolesGuard } from "../auth/roles.guard";
+import { Roles } from "../auth/roles.decorator";
+import { Public } from "../auth/public.decorator";
 
-@Controller('comments')
+@Controller("comments")
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
+  @UseGuards(AuthGuard)
   @Post()
-  create(@Body() dto: CreateCommentDto) {
-    return this.commentsService.create(dto);
+  create(@Req() req: any, @Body() dto: CreateCommentDto) {
+    return this.commentsService.create(dto, req.user.id);
   }
-
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles("ADMIN")
   @Get()
   findAll(
-    @Query('postId') postId?: string,
-    @Query('status') status?: CommentStatus,
+    @Query("postId") postId?: string,
+    @Query("status") status?: CommentStatus,
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string
   ) {
-    return this.commentsService.findAll({ postId, status });
+    return this.commentsService.findAll(
+      { postId, status },
+      limit ? Number(limit) : 20,
+      offset ? Number(offset) : 0
+    );
   }
-
-  @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
+  @Public()
+  @Get("post/:postId")
+  findByPost(
+    @Param("postId", ParseUUIDPipe) postId: string,
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string
+  ) {
+    return this.commentsService.findByPost(
+      postId,
+      limit ? Number(limit) : 20,
+      offset ? Number(offset) : 0
+    );
+  }
+  @Public()
+  @Get(":id")
+  findOne(@Param("id", ParseUUIDPipe) id: string) {
     return this.commentsService.findById(id);
   }
 
-  @Patch(':id')
+  // 🔒 KORUMALI: Sahibi veya Admin güncelleyebilir
+  @UseGuards(AuthGuard) // 🚨 Sadece AuthGuard yeterli, kimlik tespiti için!
+  @Patch(":id")
   update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateCommentDto,
+    @Req() req: any, // 🚨 İsteği yapan kişiyi yakala
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: UpdateCommentDto
   ) {
-    return this.commentsService.update(id, dto);
+    return this.commentsService.update(id, dto, req.user); // req.user servise gönderiliyor
   }
 
-  @Patch(':id/moderate')
+  // 🔒 KORUMALI: Sadece yetkililer modere edebilir (Onay/Ret)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles("ADMIN") // 🚨 Burada RolesGuard hala gerekli!
+  @Patch(":id/moderate")
   moderate(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ModerateCommentDto,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: ModerateCommentDto
   ) {
     return this.commentsService.moderate(id, dto);
   }
 
-  @Delete(':id')
+  // 🔒 KORUMALI: Sahibi veya Admin silebilir
+  @UseGuards(AuthGuard) // 🚨 Sadece AuthGuard yeterli
+  @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.commentsService.remove(id);
+  remove(@Req() req: any, @Param("id", ParseUUIDPipe) id: string) {
+    return this.commentsService.remove(id, req.user); // req.user servise gönderiliyor
   }
 }

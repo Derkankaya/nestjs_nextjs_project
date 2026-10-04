@@ -7,12 +7,12 @@ export default async function CategoriesPage() {
   let categories: any[] = [];
 
   try {
-    // 1. ADIM: Gerçek veritabanından (API üzerinden) kategorileri çekiyoruz
-    categories = await getCategories();
-  } catch (error) {
-    console.error("Kategoriler çekilirken API hatası:", error);
-  }
-
+  const res = await getCategories();
+  // Eğer res bir objeyse içindeki diziyi alıyoruz:
+  categories = res.categories || res; 
+} catch (error) {
+  console.error("Kategoriler çekilirken API hatası:", error);
+}
   return (
     <div className="min-h-screen bg-slate-50 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
